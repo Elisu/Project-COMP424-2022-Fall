@@ -77,7 +77,7 @@ class StudentAgent(Agent):
         # Endpoint already has barrier or is boarder
         is_reached = False
 
-        if not (0 <= end_pos(0) < self.board_size and 0 <= end_pos(1) < self.board_size):
+        if not (0 <= end_pos[0] < self.board_size and 0 <= end_pos[1] < self.board_size):
             return is_reached
         if not 0 <= barrier_dir <= 3:
             return is_reached
@@ -250,10 +250,10 @@ class StudentAgent(Agent):
         possible_steps = self.generate_steps(my_pos,max_step)
 
         scores = [0] * len(possible_steps)
-        for i, step in enumerate(possible_steps):
+        for i, s in enumerate(possible_steps):
 
             # Filter invalid steps
-            if self.check_valid_step(my_pos, tuple(step[0:2]), step[2]):
+            if self.check_valid_step(my_pos, tuple(s[0:2]), s[2]):
                 continue
 
             self.cur_pos = deepcopy(my_pos)
@@ -262,7 +262,7 @@ class StudentAgent(Agent):
             self.chess_board = deepcopy(chess_board)
             self.board_size = len(chess_board) ## TODO: check it works
 
-            scores[i] = self.autoplay(step)
+            #scores[i] = self.autoplay(s)
 
         # dummy returnis_reached = False
         max_score = max(scores)
