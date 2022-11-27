@@ -264,7 +264,6 @@ class StudentAgent(Agent):
         self.board_size = len(chess_board) ## TODO: check it works
 
         scores = [0] * len(possible_steps)
-        best_score =
         for i, s in enumerate(possible_steps):
 
             self.turn = 0
