@@ -25,6 +25,7 @@ class StudentAgent(Agent):
             "d": 2,
             "l": 3,
         }
+        self.turn = None
         self.cur_pos = None
         self.adv_pos = None
         self.chess_board = None
@@ -34,7 +35,7 @@ class StudentAgent(Agent):
         # Opposite Directions
         self.opposites = {0: 2, 1: 3, 2: 0, 3: 1}
 
-    def check_endgame(self):
+    def check_endgame(self, our_pos, adv_pos):
         # Union-Find
         father = dict()
         for r in range(self.board_size):
@@ -64,8 +65,8 @@ class StudentAgent(Agent):
         for r in range(self.board_size):
             for c in range(self.board_size):
                 find((r, c))
-        p0_r = find(tuple(self.p0_pos))
-        p1_r = find(tuple(self.p1_pos))
+        p0_r = find(tuple(our_pos))
+        p1_r = find(tuple(adv_pos))
         p0_score = list(father.values()).count(p0_r)
         p1_score = list(father.values()).count(p1_r)
         if p0_r == p1_r:
@@ -103,7 +104,7 @@ class StudentAgent(Agent):
                 if self.chess_board[r, c, dir]:
                     continue
 
-                next_pos = cur_pos + move
+                next_pos = (cur_pos[0] + move[0], cur_pos[1] + move[1])
                 if next_pos[0] == adv_pos[0] and next_pos[1] == adv_pos[1] or tuple(next_pos) in visited:
                     continue
                 if next_pos[0] == end_pos[0] and next_pos[1] == end_pos[1]:
@@ -120,12 +121,12 @@ class StudentAgent(Agent):
     
         # Moves (Up, Right, Down, Left)
         ori_pos = deepcopy(my_pos)
-        steps = rnd.randint(0, max_step + 1)
+        steps = rnd.randint(0, max_step)
 
         # Random Walk
         for _ in range(steps):
             r, c = my_pos
-            dir = rnd.randint(0, 4)
+            dir = rnd.randint(0, 3)
             m_r, m_c = self.moves[dir]
             my_pos = (r + m_r, c + m_c)
 
@@ -135,7 +136,7 @@ class StudentAgent(Agent):
                 k += 1
                 if k > 300:
                     break
-                dir = rnd.randint(0, 4)
+                dir = rnd.randint(0, 3)
                 m_r, m_c = self.moves[dir]
                 my_pos = (r + m_r, c + m_c)
 
@@ -144,15 +145,15 @@ class StudentAgent(Agent):
                 break
 
         # Put Barrier
-        dir = rnd.randint(0, 4)
+        dir = rnd.randint(0, 3)
         r, c = my_pos
         while chess_board[r, c, dir]:
-            dir = rnd.randint(0, 4)
+            dir = rnd.randint(0, 3)
 
         return my_pos, dir
 
     
-    def world_step(self, turn, step = None):
+    def student_world_step(self, turn, step = None):
         ## This code comes from step in world.py 
 
         if not turn:
@@ -197,20 +198,28 @@ class StudentAgent(Agent):
         # Change turn
         next_turn = 1 - turn
 
-        results = self.check_endgame()
-        self.results_cache = results
-        return results, next_turn
+        results = self.check_endgame(self.cur_pos, self.adv_pos)
+        #self.results_cache = results
+        return results[0], results[1:3], next_turn
     
     def run(self, first_step):
-        is_end, p0_score, p1_score, next_turn = self.world_step(0, first_step)
+        is_end, scores, next_turn = self.student_world_step(0, first_step)
         while not is_end:
-            is_end, p0_score, p1_score, next_turn = self.world_step(next_turn)
-        return p0_score, p1_score
+            is_end, scores, next_turn = self.student_world_step(next_turn)
+ 
+        return scores[0], scores[1]
 
-    def autoplay(self, first_step):
-        runcount = 10 # To be implemented in a more clever way        
+    def student_autoplay(self, runcount, first_step, chess_board, my_pos, adv_pos):
         p1_win_count = 0 # THis has to be array for each possible move
         for _ in range(runcount):
+
+            ##Reseting
+            self.turn = 0
+            self.chess_board = deepcopy(chess_board)
+            self.cur_pos = deepcopy(my_pos)
+            self.adv_pos = deepcopy(adv_pos)
+
+
             p0_score, p1_score = self.run(first_step)
             if p0_score > p1_score:  # THis has to be put in array for each possible move
                 p1_win_count += 2 
@@ -219,7 +228,7 @@ class StudentAgent(Agent):
         return p1_win_count
 
     def generate_steps(self,my_pos,max_step):
-        # Generate list of possible steps in diamond shape around our current position
+        # Generate list of possible end positions in diamond shape around our current position
         # with maximum distance of max_step
         steps = []
         numSteps = 0
@@ -227,7 +236,9 @@ class StudentAgent(Agent):
             for y in range(-max_step, max_step + 1):
                 if abs(x)+abs(y) <= max_step:
                     for dir in range(0,4):
-                        steps.append([x,y,dir])
+                        new_x = my_pos[0] + x
+                        new_y = my_pos[1] + y
+                        steps.append([new_x, new_y, dir])
         
         return steps
         
@@ -249,20 +260,23 @@ class StudentAgent(Agent):
         """
         possible_steps = self.generate_steps(my_pos,max_step)
 
+        self.max_step = max_step
+        self.board_size = len(chess_board) ## TODO: check it works
+
         scores = [0] * len(possible_steps)
+        best_score =
         for i, s in enumerate(possible_steps):
 
-            # Filter invalid steps
-            if self.check_valid_step(my_pos, tuple(s[0:2]), s[2]):
-                continue
-
+            self.turn = 0
+            self.chess_board = deepcopy(chess_board)
             self.cur_pos = deepcopy(my_pos)
             self.adv_pos = deepcopy(adv_pos)
-            self.max_step = max_step
-            self.chess_board = deepcopy(chess_board)
-            self.board_size = len(chess_board) ## TODO: check it works
 
-            #scores[i] = self.autoplay(s)
+            # Filter invalid steps
+            if not self.check_valid_step(my_pos, tuple(s[0:2]), s[2]):
+                continue
+
+            scores[i] = self.student_autoplay(s, 10, chess_board, my_pos, adv_pos)
 
         # dummy returnis_reached = False
         max_score = max(scores)
