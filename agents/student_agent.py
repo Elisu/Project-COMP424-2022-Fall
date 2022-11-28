@@ -209,23 +209,107 @@ class StudentAgent(Agent):
  
         return scores[0], scores[1]
 
-    def student_autoplay(self, runcount, first_step, chess_board, my_pos, adv_pos):
-        p1_win_count = 0 # THis has to be array for each possible move
-        for _ in range(runcount):
 
-            ##Reseting
+    def student_autoplay2(self, runcount, possible_steps, chess_board, my_pos, adv_pos):
+        
+        self.chess_board = chess_board
+        self.adv_pos = adv_pos
+        self.cur_pos = my_pos
+
+        valid_steps = []
+        for i, s in enumerate(possible_steps):
+            if self.check_valid_step(my_pos, tuple(s[0:2]), s[2]):
+                valid_steps.append(possible_steps[i])
+
+        numValidSteps = len(valid_steps)
+
+        score_eval = [0]*numValidSteps
+
+        steps = deepcopy(valid_steps)
+        for j in range(1, runcount + 1): # Loop over instances/threads of the game
+            for i,s in enumerate(steps): # Loop over possible steps.
+                ##Reseting
+                self.turn = 0
+                self.chess_board = deepcopy(chess_board)
+                self.cur_pos = deepcopy(my_pos)
+                self.adv_pos = deepcopy(adv_pos)
+
+                # Run one instance of the game 
+                p0_score, _ = self.run(s)
+                score_eval[i] = (p0_score+score_eval[i])/(j*2)
+            
+            if j>=4 and len(score_eval) > 0:
+                # find median and remove bad steps
+                scores_sorted = deepcopy(score_eval)
+                scores_sorted.sort()
+                score_median = scores_sorted[len(scores_sorted)//2]
+
+                # Find the bad steps (worse evaluation than median score)
+                bad_score_idx = [i if score < score_median else -1 for i, score in enumerate(score_eval)]
+                # Remove from list of potential steps, so that we loop over a smaller array
+                steps = [step for step, bad_score_index in zip(steps, bad_score_idx) if bad_score_index >= 0]
+                # Also remove from the score evaluation list
+                score_eval = [score for score, bad_score_index in zip(score_eval, bad_score_idx) if bad_score_index >= 0]
+            
+            if len(steps) <= 2:
+                break
+
+        max_score = max(score_eval)
+        indices = [index for index, item in enumerate(score_eval) if item == max_score]
+        best_index = rnd.randint(0, len(indices) - 1)
+        best_step = steps[indices[best_index]]
+        
+        return best_step
+
+    def student_autoplay(self, runcount, possible_steps, chess_board, my_pos, adv_pos):
+
+        scores = [0] * len(possible_steps)
+
+        ## Try all possible steps
+        for i, step in enumerate(possible_steps):
+
             self.turn = 0
-            self.chess_board = deepcopy(chess_board)
+            self.chess_board = chess_board
             self.cur_pos = deepcopy(my_pos)
             self.adv_pos = deepcopy(adv_pos)
 
+            # Filter invalid steps
+            if not self.check_valid_step(my_pos, tuple(step[0:2]), step[2]):
+                continue
 
-            p0_score, p1_score = self.run(first_step)
-            if p0_score > p1_score:  # THis has to be put in array for each possible move
-                p1_win_count += 2 
-            elif p0_score == p1_score:  # Tie
-                p1_win_count += 1
-        return p1_win_count
+            self.chess_board = deepcopy(chess_board)
+
+            p1_win_count = 0 
+
+            ## Autoplay with current step and count aggregated score
+            for j in range(runcount):
+
+                ##Reseting
+                self.turn = 0
+                self.chess_board = deepcopy(chess_board)
+                self.cur_pos = deepcopy(my_pos)
+                self.adv_pos = deepcopy(adv_pos)
+
+
+                ## Running with step and then random
+                p0_score, p1_score = self.run(step)
+                if p0_score > p1_score:  # THis has to be put in array for each possible move
+                    p1_win_count += 2 
+                elif p0_score == p1_score:  # Tie
+                    p1_win_count += 1
+
+                if j == runcount // 2 and p1_win_count == 0:
+                    break                    
+
+            scores[i] = p1_win_count
+
+        ## Find best move
+        max_score = max(scores)
+        indices = [index for index, item in enumerate(scores) if item == max_score]
+        best_index = rnd.randint(0, len(indices) - 1)
+        return possible_steps[indices[best_index]]
+
+
 
     def generate_steps(self,my_pos,max_step):
         # Generate list of possible end positions in diamond shape around our current position
@@ -261,26 +345,12 @@ class StudentAgent(Agent):
         possible_steps = self.generate_steps(my_pos,max_step)
 
         self.max_step = max_step
-        self.board_size = len(chess_board) ## TODO: check it works
+        self.board_size = len(chess_board)
 
-        scores = [0] * len(possible_steps)
-        for i, s in enumerate(possible_steps):
+        #scores = [0] * len(possible_steps)
+        
+        best_step = self.student_autoplay2(10,possible_steps, chess_board, my_pos, adv_pos)
 
-            self.turn = 0
-            self.chess_board = deepcopy(chess_board)
-            self.cur_pos = deepcopy(my_pos)
-            self.adv_pos = deepcopy(adv_pos)
-
-            # Filter invalid steps
-            if not self.check_valid_step(my_pos, tuple(s[0:2]), s[2]):
-                continue
-
-            scores[i] = self.student_autoplay(s, 10, chess_board, my_pos, adv_pos)
-
-        # dummy returnis_reached = False
-        max_score = max(scores)
-        indices = [index for index, item in enumerate(scores) if item == max_score]
-        best_index = rnd.randint(0, len(indices) - 1)
-        best_step = possible_steps[indices[best_index]]
+        #best_step = self.student_autoplay(10, possible_steps, chess_board, my_pos, adv_pos)
 
         return tuple(best_step[0:2]), best_step[2]
