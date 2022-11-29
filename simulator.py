@@ -81,6 +81,9 @@ class Simulator:
             self.reset()
 
     def run(self, swap_players=False, board_size=None):
+        ## OBS: THIS CODE WAS ADDED BY FREJA
+        with open('times_player1_boardsize_{}.txt'.format(simulator.args.board_size), 'w') as filehandle:
+                filehandle.write(("Time"))
         self.reset(swap_players=swap_players, board_size=board_size)
         is_end, p0_score, p1_score = self.world.step()
         while not is_end:
@@ -88,6 +91,9 @@ class Simulator:
         logger.info(
             f"Run finished. Player {PLAYER_1_NAME}: {p0_score}, Player {PLAYER_2_NAME}: {p1_score}"
         )
+        ## OBS: THIS CODE WAS ADDED BY FREJA
+        with open('times_player1_boardsize_{}.txt'.format(simulator.args.board_size), 'a') as filehandle:
+                filehandle.write(("\n"))
         return p0_score, p1_score, self.world.p0_time, self.world.p1_time
 
     def autoplay(self):

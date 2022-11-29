@@ -25,6 +25,7 @@ class StudentAgent(Agent):
             "d": 2,
             "l": 3,
         }
+        self.autoplay = True
         self.turn = None
         self.cur_pos = None
         self.adv_pos = None
@@ -212,9 +213,9 @@ class StudentAgent(Agent):
 
     def student_autoplay2(self, runcount, possible_steps, chess_board, my_pos, adv_pos):
         
-        self.chess_board = chess_board
-        self.adv_pos = adv_pos
-        self.cur_pos = my_pos
+        self.chess_board = deepcopy(chess_board) # Freja: I added the deepcopy
+        self.adv_pos =  deepcopy(adv_pos)
+        self.cur_pos =  deepcopy(my_pos)
 
         valid_steps = []
         for i, s in enumerate(possible_steps):
@@ -236,28 +237,32 @@ class StudentAgent(Agent):
 
                 # Run one instance of the game 
                 p0_score, _ = self.run(s)
-                score_eval[i] = (p0_score+score_eval[i])/(j*2)
+                #score_eval[i] = (p0_score+score_eval[i])/(j*2) # Save scores in %
+                score_eval[i] = p0_score+score_eval[i] # Save absolute scores
             
             if j>=4 and len(score_eval) > 0:
                 # find median and remove bad steps
                 scores_sorted = deepcopy(score_eval)
                 scores_sorted.sort()
-                score_median = scores_sorted[len(scores_sorted)//2]
+                score_median = scores_sorted[len(scores_sorted)//4]
 
                 # Find the bad steps (worse evaluation than median score)
                 bad_score_idx = [i if score < score_median else -1 for i, score in enumerate(score_eval)]
                 # Remove from list of potential steps, so that we loop over a smaller array
-                steps = [step for step, bad_score_index in zip(steps, bad_score_idx) if bad_score_index >= 0]
+                #steps = [step for step, bad_score_index in zip(steps, bad_score_idx) if bad_score_index >= 0]
+                # Freja: We keep the ones with a bad_score_index <0 because those were the good scores!!!
+                steps = [step for step, bad_score_index in zip(steps, bad_score_idx) if bad_score_index < 0]
                 # Also remove from the score evaluation list
-                score_eval = [score for score, bad_score_index in zip(score_eval, bad_score_idx) if bad_score_index >= 0]
+                #score_eval = [score for score, bad_score_index in zip(score_eval, bad_score_idx) if bad_score_index >= 0]
+                score_eval = [score for score, bad_score_index in zip(score_eval, bad_score_idx) if bad_score_index < 0]
             
             if len(steps) <= 2:
                 break
 
         max_score = max(score_eval)
         indices = [index for index, item in enumerate(score_eval) if item == max_score]
-        best_index = rnd.randint(0, len(indices) - 1)
-        best_step = steps[indices[best_index]]
+        random_best_index = rnd.randint(0, len(indices) - 1)
+        best_step = steps[indices[random_best_index]]
         
         return best_step
 
@@ -282,7 +287,7 @@ class StudentAgent(Agent):
             p1_win_count = 0 
 
             ## Autoplay with current step and count aggregated score
-            for j in range(runcount):
+            for j in range(runcount): # Should it be +1 ? 
 
                 ##Reseting
                 self.turn = 0

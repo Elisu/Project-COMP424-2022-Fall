@@ -184,6 +184,9 @@ class World:
         """
         if not self.turn:
             self.p0_time += time_taken
+            ## OBS: THIS CODE WAS ADDED BY FREJA
+            with open('times_player1_boardsize_{}.txt'.format(self.board_size), 'a') as filehandle:
+                filehandle.write(("\n{}".format(time_taken)))
         else:
             self.p1_time += time_taken
 
