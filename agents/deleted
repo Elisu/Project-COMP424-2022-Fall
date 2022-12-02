@@ -1,0 +1,47 @@
+    def student_autoplay(self, runcount, possible_steps, chess_board, my_pos, adv_pos):
+
+        scores = [0] * len(possible_steps)
+
+        ## Try all possible steps
+        for i, step in enumerate(possible_steps):
+
+            self.turn = 0
+            self.chess_board = chess_board
+            self.cur_pos = deepcopy(my_pos)
+            self.adv_pos = deepcopy(adv_pos)
+
+            # Filter invalid steps
+            if not self.check_valid_step(my_pos, tuple(step[0:2]), step[2]):
+                continue
+
+            self.chess_board = deepcopy(chess_board)
+
+            p1_win_count = 0 
+
+            ## Autoplay with current step and count aggregated score
+            for j in range(runcount): # Should it be +1 ? 
+
+                ##Reseting
+                self.turn = 0
+                self.chess_board = deepcopy(chess_board)
+                self.cur_pos = deepcopy(my_pos)
+                self.adv_pos = deepcopy(adv_pos)
+
+
+                ## Running with step and then random
+                p0_score, p1_score = self.run(step)
+                if p0_score > p1_score:  # THis has to be put in array for each possible move
+                    p1_win_count += 2 
+                elif p0_score == p1_score:  # Tie
+                    p1_win_count += 1
+
+                if j == runcount // 2 and p1_win_count == 0:
+                    break                    
+
+            scores[i] = p1_win_count
+
+        ## Find best move
+        max_score = max(scores)
+        indices = [index for index, item in enumerate(scores) if item == max_score]
+        best_index = rnd.randint(0, len(indices) - 1)
+        return possible_steps[indices[best_index]]

@@ -15,6 +15,7 @@ logging.basicConfig(format="%(levelname)s:%(message)s", level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
+#np.random.seed(10)
 class World:
     def __init__(
         self,
@@ -185,7 +186,7 @@ class World:
         if not self.turn:
             self.p0_time += time_taken
             ## OBS: THIS CODE WAS ADDED BY FREJA
-            with open('times_player1_boardsize_{}.txt'.format(self.board_size), 'a') as filehandle:
+            with open('data/times_player1_boardsize_{}.txt'.format(self.board_size), 'a') as filehandle:
                 filehandle.write(("\n{}".format(time_taken)))
         else:
             self.p1_time += time_taken

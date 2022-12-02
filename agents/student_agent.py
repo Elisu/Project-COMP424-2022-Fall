@@ -1,16 +1,18 @@
 # Student agent: Add your own agent here
-from gettext import find
-from tracemalloc import start
-from typing import no_type_check
+#from gettext import find
+#from tracemalloc import start
+#from typing import no_type_check
 from agents.agent import Agent
 from store import register_agent
 import random as rnd
 from copy import deepcopy
 import sys
+from time import time
 
 
 @register_agent("student_agent")
 class StudentAgent(Agent):
+    #rnd.seed(16)
     """
     A dummy class for your implementation. Feel free to use this class to
     add any helper functionalities needed for your agent.
@@ -33,8 +35,15 @@ class StudentAgent(Agent):
         self.max_step = None
         self.board_size = None
         self.moves = ((-1, 0), (0, 1), (1, 0), (0, -1))
+        self.num_steps = 0
         # Opposite Directions
         self.opposites = {0: 2, 1: 3, 2: 0, 3: 1}
+        self.autoplay_time = 0
+        self.initial_step_time = 0
+        self.num_precalculated_steps = 0
+        self.num_games_autoplay = 10
+        self.num_autoplay_initial = 2
+        
 
     def check_endgame(self, our_pos, adv_pos):
         # Union-Find
@@ -156,6 +165,7 @@ class StudentAgent(Agent):
     
     def student_world_step(self, turn, step = None):
         ## This code comes from step in world.py 
+        # The function modifies the self.chess_board value to include the new step.
 
         if not turn:
             cur_pos = self.cur_pos
@@ -181,7 +191,6 @@ class StudentAgent(Agent):
 
             if not self.check_valid_step(cur_pos, next_pos, dir):
                 seek_valid_step = True
-        
         
         if not turn:
             self.cur_pos = next_pos
@@ -222,6 +231,7 @@ class StudentAgent(Agent):
             if self.check_valid_step(my_pos, tuple(s[0:2]), s[2]):
                 valid_steps.append(possible_steps[i])
 
+
         numValidSteps = len(valid_steps)
 
         score_eval = [0]*numValidSteps
@@ -234,13 +244,13 @@ class StudentAgent(Agent):
                 self.chess_board = deepcopy(chess_board)
                 self.cur_pos = deepcopy(my_pos)
                 self.adv_pos = deepcopy(adv_pos)
-
+                
                 # Run one instance of the game 
                 p0_score, _ = self.run(s)
                 #score_eval[i] = (p0_score+score_eval[i])/(j*2) # Save scores in %
                 score_eval[i] = p0_score+score_eval[i] # Save absolute scores
             
-            if j>=4 and len(score_eval) > 0:
+            if j>=1 and len(score_eval) > 0:
                 # find median and remove bad steps
                 scores_sorted = deepcopy(score_eval)
                 scores_sorted.sort()
@@ -266,55 +276,38 @@ class StudentAgent(Agent):
         
         return best_step
 
-    def student_autoplay(self, runcount, possible_steps, chess_board, my_pos, adv_pos):
 
-        scores = [0] * len(possible_steps)
+    def initialStep(self, possible_steps, chess_board, my_pos, adv_pos, numStep,num_autoplay):
 
-        ## Try all possible steps
-        for i, step in enumerate(possible_steps):
+        # Time the function; while we're still under 30 secs, continue, but stop if we're approacing it
+        self.chess_board = deepcopy(chess_board)
+        chess_board_in = deepcopy(chess_board)
 
-            self.turn = 0
-            self.chess_board = chess_board
+        best_steps = []
+        for i in range(numStep):
+            print("Pre-calculate step number {}".format(i+1))
+            possible_steps = self.generate_steps(my_pos,self.max_step)
+            # Find the best initial step using autoplay
+            best_steps.append(self.student_autoplay2(num_autoplay,possible_steps, chess_board, my_pos, adv_pos))
+            # Reset values
+            self.chess_board = deepcopy(chess_board)
+            # Take step with our player
             self.cur_pos = deepcopy(my_pos)
             self.adv_pos = deepcopy(adv_pos)
+            is_end, scores, next_turn= self.student_world_step(0, best_steps[i]) # alters self.cur_pos (our position)
+            results = self.check_endgame(self.cur_pos, self.adv_pos)
+            if results[0]:
+                break
+            # Take random step with the other player
+            is_end, scores, next_turn = self.student_world_step(next_turn)  # alters self.adv (their position)
+            # set new chess_board and positions!!
+            chess_board = deepcopy(self.chess_board) # Update chess_board value
+            my_pos = deepcopy(self.cur_pos)
+            adv_pos = deepcopy(self.adv_pos)
 
-            # Filter invalid steps
-            if not self.check_valid_step(my_pos, tuple(step[0:2]), step[2]):
-                continue
+        return best_steps
 
-            self.chess_board = deepcopy(chess_board)
-
-            p1_win_count = 0 
-
-            ## Autoplay with current step and count aggregated score
-            for j in range(runcount): # Should it be +1 ? 
-
-                ##Reseting
-                self.turn = 0
-                self.chess_board = deepcopy(chess_board)
-                self.cur_pos = deepcopy(my_pos)
-                self.adv_pos = deepcopy(adv_pos)
-
-
-                ## Running with step and then random
-                p0_score, p1_score = self.run(step)
-                if p0_score > p1_score:  # THis has to be put in array for each possible move
-                    p1_win_count += 2 
-                elif p0_score == p1_score:  # Tie
-                    p1_win_count += 1
-
-                if j == runcount // 2 and p1_win_count == 0:
-                    break                    
-
-            scores[i] = p1_win_count
-
-        ## Find best move
-        max_score = max(scores)
-        indices = [index for index, item in enumerate(scores) if item == max_score]
-        best_index = rnd.randint(0, len(indices) - 1)
-        return possible_steps[indices[best_index]]
-
-
+     
 
     def generate_steps(self,my_pos,max_step):
         # Generate list of possible end positions in diamond shape around our current position
@@ -330,6 +323,39 @@ class StudentAgent(Agent):
                         steps.append([new_x, new_y, dir])
         
         return steps
+
+    def choose_num_steps(self,num_steps):
+
+        if num_steps == 0:
+            if self.board_size < 8:
+                self.num_precalculated_steps = 2
+                self.num_games_autoplay = 20
+                self.num_autoplay_initial = 10
+            elif self.board_size == 8:
+                self.num_precalculated_steps = 2
+                self.num_games_autoplay = 20
+                self.num_autoplay_initial = 10
+            elif self.board_size == 9:
+                self.num_precalculated_steps = 3
+                self.num_games_autoplay = 10
+                self.num_autoplay_initial = 20
+            elif self.board_size == 10:
+                self.num_precalculated_steps = 5
+                self.num_games_autoplay = 10
+                self.num_autoplay_initial = 10
+            elif self.board_size == 11:
+                self.num_precalculated_steps = 5
+                self.num_games_autoplay = 2
+                self.num_autoplay_initial = 4
+            elif self.board_size == 12:
+                self.num_precalculated_steps = 3
+                self.num_games_autoplay = 1
+                self.num_autoplay_initial = 2
+        else:
+            if self.autoplay_time > 1.9 and self.num_games_autoplay>1:
+                self.num_games_autoplay = round(self.num_games_autoplay/2)
+            elif self.autoplay_time < 0.3 and self.num_games_autoplay <50:
+                self.num_games_autoplay = self.num_games_autoplay*2
         
 
     def step(self, chess_board, my_pos, adv_pos, max_step):
@@ -347,15 +373,34 @@ class StudentAgent(Agent):
 
         Please check the sample implementation in agents/random_agent.py or agents/human_agent.py for more details.
         """
+
         possible_steps = self.generate_steps(my_pos,max_step)
 
         self.max_step = max_step
         self.board_size = len(chess_board)
 
-        #scores = [0] * len(possible_steps)
-        
-        best_step = self.student_autoplay2(10,possible_steps, chess_board, my_pos, adv_pos)
-
+        self.choose_num_steps(self.num_steps)
+        if self.num_steps == 0:
+            # NB: REMEMBER TO DELETE THIS
+            #with open('data/threads_player1_boardsize_{}.txt'.format(self.board_size), 'w') as filehandle:
+            #        filehandle.write(("Threads\n"))
+            start_time = time()
+            self.first_steps_list = self.initialStep(possible_steps, chess_board, my_pos, adv_pos,self.num_precalculated_steps,self.num_autoplay_initial)
+            self.initial_step_time = time() - start_time
+        len_list = len(self.first_steps_list)
+        if self.num_steps < len_list:
+            best_step = self.first_steps_list[self.num_steps]
+            self.num_steps = self.num_steps +1
+        if self.num_steps < len_list and self.check_valid_step(my_pos, tuple(best_step[0:2]), best_step[2]):
+            print("*** Precalculated move was invalid ***")
+            return tuple(best_step[0:2]), best_step[2]
+        else:
+            start_time = time()
+            best_step = self.student_autoplay2(self.num_games_autoplay,possible_steps, chess_board, my_pos, adv_pos)
+            self.autoplay_time = time() - start_time
         #best_step = self.student_autoplay(10, possible_steps, chess_board, my_pos, adv_pos)
+        # NB: REMEMBER TO DELETE THIS
+        #with open('data/threads_player1_boardsize_{}.txt'.format(self.board_size), 'a') as filehandle:
+        #    filehandle.write(("{}\n".format(self.num_games_autoplay)))
 
         return tuple(best_step[0:2]), best_step[2]
