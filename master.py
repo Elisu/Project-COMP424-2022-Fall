@@ -1,4 +1,5 @@
 import subprocess
 
 
-subprocess.call("python simulator.py --player_1 student_agent --player_2 random_agent", shell=True)
+for b in range(6,13):
+    subprocess.call("python simulator.py --player_1 student_agent --player_2 random_agent --board_size "+ str(b), shell=True)

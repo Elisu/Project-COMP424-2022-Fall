@@ -13,7 +13,7 @@ time_b10 <- as.array(read.delim("data/times_player1_boardsize_10.txt")[,1])
 time_b11 <- as.array(read.delim("data/times_player1_boardsize_11.txt")[,1])
 time_b12 <- as.array(read.delim("data/times_player1_boardsize_12.txt")[,1])
 
-thread_b6 <- as.array(read.delim("data/times_player1_boardsize_6.txt")[,1])
+thread_b6 <- as.array(read.delim("data/threads_player1_boardsize_6.txt")[,1])
 thread_b7 <- as.array(read.delim("data/threads_player1_boardsize_7.txt")[,1])
 thread_b8 <- as.array(read.delim("data/threads_player1_boardsize_8.txt")[,1])
 thread_b9 <- as.array(read.delim("data/threads_player1_boardsize_9.txt")[,1])
@@ -59,24 +59,24 @@ data_threads[,board_size := factor(as.character(board_size),as.character(seq(12,
 
 ggplot(data, aes(x=round, y=time, group = board_size, color = board_size)) +
   geom_line()+
-  theme(text = element_text(size = 20)) +
-  ggtitle("Time spend on each move") + 
+  theme(text = element_text(size = 18)) +
+  ggtitle("Time spent on each move") + 
   xlab("Round") + 
   ylab("Time (s)") + 
   geom_hline(yintercept=2, linetype="dashed", color = "black") +
   geom_hline(yintercept=30, linetype="dashed", color = "black") +
   labs(color='Board size')
 
-ggsave("times_autoplay2_tuned.eps", plot = last_plot(), width = 17, height = 12,units = "cm")
+ggsave("times_autoplay2_tuned.eps", plot = last_plot(), width = 18, height = 12,units = "cm")
 
 ggplot(data_threads, aes(x=round, y=time, group = board_size, color = board_size)) +
   geom_line()+
-  theme(text = element_text(size = 20)) +
-  ggtitle("Number of threads in search tree") + 
+  theme(text = element_text(size = 18)) +
+  ggtitle("Number of simulations per move") + 
   xlab("Round") + 
-  ylab("Number of threads") + 
+  ylab("Simulations (#)") + 
   labs(color='Board size')
 
-ggsave("threads_autoplay2_tuned.eps", plot = last_plot(), width = 17, height = 12,units = "cm")
+ggsave("threads_autoplay2_tuned.eps", plot = last_plot(), width = 18, height = 12,units = "cm")
 
 

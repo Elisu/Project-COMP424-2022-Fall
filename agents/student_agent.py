@@ -9,6 +9,19 @@ from copy import deepcopy
 import sys
 from time import time
 
+## ----------------------- INFORMATION ABOUT IMPLEMENTATION ----------------------- ##
+
+# We have copied some functions from world.py and altered them to fit in our code. 
+# The purpose of doing that is to be able to make simulations of the game forward 
+# in time but without affecting the original game.
+# The functions we have copied are:
+#       - check_endgame()
+#       - check_valid_step()
+#       - random_step() (comes from random_agent.py)
+#       - step(), here it's named student_world_step() to avoid confusion
+# 
+# The function that is called 
+
 
 @register_agent("student_agent")
 class StudentAgent(Agent):
@@ -27,25 +40,25 @@ class StudentAgent(Agent):
             "d": 2,
             "l": 3,
         }
-        self.autoplay = True
-        self.turn = None
-        self.cur_pos = None
-        self.adv_pos = None
-        self.chess_board = None
-        self.max_step = None
-        self.board_size = None
-        self.moves = ((-1, 0), (0, 1), (1, 0), (0, -1))
-        self.num_steps = 0
-        # Opposite Directions
-        self.opposites = {0: 2, 1: 3, 2: 0, 3: 1}
-        self.autoplay_time = 0
-        self.initial_step_time = 0
-        self.num_precalculated_steps = 0
-        self.num_games_autoplay = 10
-        self.num_autoplay_initial = 2
+        self.turn = None                                # Whose turn it is. 0: our player. 1: opponent's turn
+        self.cur_pos = None                             # Current position of our player
+        self.adv_pos = None                             # Current position of opponent
+        self.chess_board = None                         # Array containing the chessbord state in terms of barriers
+        self.max_step = None                            # Maximum number of steps to move in game
+        self.board_size = None                          # Board size
+        self.moves = ((-1, 0), (0, 1), (1, 0), (0, -1)) # Possible moves
+        self.opposites = {0: 2, 1: 3, 2: 0, 3: 1}       # Opposite Directions
+
+        # Created for use in our implementation of the agent:
+        self.iter = 0                                   # Number of moves made so far by our agent
+        self.MCTS_time = 0                              # Time spent on MCTS
+        self.num_precalculated_steps = 0                # Number of precalculated states
+        self.num_sim_MCTS = 10                          # Number of simulations to run per possible move
+        self.num_sim_initial = 2                        # Number of simulations to run per possible move in pre-calculations
         
 
     def check_endgame(self, our_pos, adv_pos):
+        #### This code is copied from 'world.py' and altered to fit in our code
         # Union-Find
         father = dict()
         for r in range(self.board_size):
@@ -84,8 +97,8 @@ class StudentAgent(Agent):
         return True, p0_score, p1_score
     
     def check_valid_step(self, start_pos, end_pos, barrier_dir):
-        #### This code is copied from 'world.py'
-        # Endpoint already has barrier or is boarder
+        #### This code is copied from 'world.py' and altered to fit in our code
+        
         is_reached = False
 
         if not (0 <= end_pos[0] < self.board_size and 0 <= end_pos[1] < self.board_size):
@@ -164,9 +177,8 @@ class StudentAgent(Agent):
 
     
     def student_world_step(self, turn, step = None):
-        ## This code comes from step in world.py 
+        ## This code comes from 'step' function in world.py 
         # The function modifies the self.chess_board value to include the new step.
-
         if not turn:
             cur_pos = self.cur_pos
             adv_pos = self.adv_pos
@@ -213,6 +225,7 @@ class StudentAgent(Agent):
         return results[0], results[1:3], next_turn
     
     def run(self, first_step):
+        # This function runs the steps in the simulations of the MCTS
         is_end, scores, next_turn = self.student_world_step(0, first_step)
         while not is_end:
             is_end, scores, next_turn = self.student_world_step(next_turn)
@@ -220,26 +233,31 @@ class StudentAgent(Agent):
         return scores[0], scores[1]
 
 
-    def student_autoplay2(self, runcount, possible_steps, chess_board, my_pos, adv_pos):
+    def MCTS_simulation(self, runcount, possible_steps, chess_board, my_pos, adv_pos):
+        # This function runs the MCTS simulations.
         
-        self.chess_board = deepcopy(chess_board) # Freja: I added the deepcopy
+        # Overwrite self with inputted values to reset
+        self.chess_board = deepcopy(chess_board)
         self.adv_pos =  deepcopy(adv_pos)
         self.cur_pos =  deepcopy(my_pos)
 
+        # Check which steps in 'possible_steps'-input are valid and save them. 
+        # Only perform MCTS with them 
         valid_steps = []
         for i, s in enumerate(possible_steps):
             if self.check_valid_step(my_pos, tuple(s[0:2]), s[2]):
                 valid_steps.append(possible_steps[i])
 
-
+        # Number of valid steps
         numValidSteps = len(valid_steps)
-
+        # Array to hold the scores of each step
         score_eval = [0]*numValidSteps
 
+        # Take out steps
         steps = deepcopy(valid_steps)
-        for j in range(1, runcount + 1): # Loop over instances/threads of the game
+        for j in range(1, runcount + 1): # Loop over instances/simulations of the game
             for i,s in enumerate(steps): # Loop over possible steps.
-                ##Reseting
+                # Reset values
                 self.turn = 0
                 self.chess_board = deepcopy(chess_board)
                 self.cur_pos = deepcopy(my_pos)
@@ -247,54 +265,57 @@ class StudentAgent(Agent):
                 
                 # Run one instance of the game 
                 p0_score, _ = self.run(s)
-                #score_eval[i] = (p0_score+score_eval[i])/(j*2) # Save scores in %
                 score_eval[i] = p0_score+score_eval[i] # Save absolute scores
             
-            if j>=1 and len(score_eval) > 0:
+            # Begin to eliminate bad steps
+            if j>=1 and len(score_eval) > 0: 
                 # find median and remove bad steps
                 scores_sorted = deepcopy(score_eval)
                 scores_sorted.sort()
-                score_median = scores_sorted[len(scores_sorted)//4]
+                score_median = scores_sorted[len(scores_sorted)//4] # remove 3/4 of the steps
 
                 # Find the bad steps (worse evaluation than median score)
                 bad_score_idx = [i if score < score_median else -1 for i, score in enumerate(score_eval)]
                 # Remove from list of potential steps, so that we loop over a smaller array
-                #steps = [step for step, bad_score_index in zip(steps, bad_score_idx) if bad_score_index >= 0]
-                # Freja: We keep the ones with a bad_score_index <0 because those were the good scores!!!
                 steps = [step for step, bad_score_index in zip(steps, bad_score_idx) if bad_score_index < 0]
                 # Also remove from the score evaluation list
-                #score_eval = [score for score, bad_score_index in zip(score_eval, bad_score_idx) if bad_score_index >= 0]
                 score_eval = [score for score, bad_score_index in zip(score_eval, bad_score_idx) if bad_score_index < 0]
             
+            # If we have too few steps left, break out of the loop
             if len(steps) <= 2:
                 break
 
+        # Maximum score
         max_score = max(score_eval)
+        # Take out indices of maximum score
         indices = [index for index, item in enumerate(score_eval) if item == max_score]
+        # Choose a random index among the maximum scores and return the step. 
         random_best_index = rnd.randint(0, len(indices) - 1)
         best_step = steps[indices[random_best_index]]
         
-        return best_step
+        return best_step 
 
 
     def initialStep(self, possible_steps, chess_board, my_pos, adv_pos, numStep,num_autoplay):
+        # This function performs the pre-calculations
 
-        # Time the function; while we're still under 30 secs, continue, but stop if we're approacing it
+        # Overwrite self with the chess_board
         self.chess_board = deepcopy(chess_board)
-        chess_board_in = deepcopy(chess_board)
 
-        best_steps = []
-        for i in range(numStep):
+        best_steps = [] # Array for saving the steps to take.
+        for i in range(numStep): # Loop over number of pre-calculated steps
             print("Pre-calculate step number {}".format(i+1))
+            # Generate possible steps
             possible_steps = self.generate_steps(my_pos,self.max_step)
-            # Find the best initial step using autoplay
-            best_steps.append(self.student_autoplay2(num_autoplay,possible_steps, chess_board, my_pos, adv_pos))
+            # Find the best initial step using MCTS
+            best_steps.append(self.MCTS_simulation(num_autoplay,possible_steps, chess_board, my_pos, adv_pos))
             # Reset values
             self.chess_board = deepcopy(chess_board)
-            # Take step with our player
             self.cur_pos = deepcopy(my_pos)
             self.adv_pos = deepcopy(adv_pos)
+            # Take step with our player
             is_end, scores, next_turn= self.student_world_step(0, best_steps[i]) # alters self.cur_pos (our position)
+            # See if we reached the end of the game. If so, break
             results = self.check_endgame(self.cur_pos, self.adv_pos)
             if results[0]:
                 break
@@ -325,82 +346,82 @@ class StudentAgent(Agent):
         return steps
 
     def choose_num_steps(self,num_steps):
-
+        # This function initializes the number of simulations in the MCTS as well as the number of pre-calculated steps.
         if num_steps == 0:
             if self.board_size < 8:
                 self.num_precalculated_steps = 2
-                self.num_games_autoplay = 20
-                self.num_autoplay_initial = 10
+                self.num_sim_MCTS = 20
+                self.num_sim_initial = 10
             elif self.board_size == 8:
                 self.num_precalculated_steps = 2
-                self.num_games_autoplay = 20
-                self.num_autoplay_initial = 10
+                self.num_sim_MCTS = 20
+                self.num_sim_initial = 10
             elif self.board_size == 9:
                 self.num_precalculated_steps = 3
-                self.num_games_autoplay = 10
-                self.num_autoplay_initial = 20
+                self.num_sim_MCTS = 10
+                self.num_sim_initial = 20
             elif self.board_size == 10:
                 self.num_precalculated_steps = 5
-                self.num_games_autoplay = 10
-                self.num_autoplay_initial = 10
+                self.num_sim_MCTS = 10
+                self.num_sim_initial = 10
             elif self.board_size == 11:
                 self.num_precalculated_steps = 5
-                self.num_games_autoplay = 2
-                self.num_autoplay_initial = 4
+                self.num_sim_MCTS = 2
+                self.num_sim_initial = 4
             elif self.board_size == 12:
                 self.num_precalculated_steps = 3
-                self.num_games_autoplay = 1
-                self.num_autoplay_initial = 2
+                self.num_sim_MCTS = 1
+                self.num_sim_initial = 2
         else:
-            if self.autoplay_time > 1.9 and self.num_games_autoplay>1:
-                self.num_games_autoplay = round(self.num_games_autoplay/2)
-            elif self.autoplay_time < 0.3 and self.num_games_autoplay <50:
-                self.num_games_autoplay = self.num_games_autoplay*2
+            # Here, we make the parameters dependent on the time spent.
+            if self.MCTS_time > 1.9 and self.num_sim_MCTS>1:
+                self.num_sim_MCTS = round(self.num_sim_MCTS/2)
+            elif self.MCTS_time < 0.3 and self.num_sim_MCTS <50:
+                self.num_sim_MCTS = self.num_sim_MCTS*2
         
 
     def step(self, chess_board, my_pos, adv_pos, max_step):
         """
-        Implement the step function of your agent here.
-        You can use the following variables to access the chess board:
-        - chess_board: a numpy array of shape (x_max, y_max, 4)
-        - my_pos: a tuple of (x, y)
-        - adv_pos: a tuple of (x, y)
-        - max_step: an integer
-
-        You should return a tuple of ((x, y), dir),
-        where (x, y) is the next position of your agent and dir is the direction of the wall
-        you want to put on.
-
-        Please check the sample implementation in agents/random_agent.py or agents/human_agent.py for more details.
+        This function returns the step of the agent.
         """
 
-        possible_steps = self.generate_steps(my_pos,max_step)
-
+        # Save input values in self
         self.max_step = max_step
         self.board_size = len(chess_board)
 
-        self.choose_num_steps(self.num_steps)
-        if self.num_steps == 0:
-            # NB: REMEMBER TO DELETE THIS
+        # Generate all possible steps from current position
+        # Inside the functions, it is evaluated whether they are valid
+        possible_steps = self.generate_steps(my_pos,max_step)
+
+        # Get parameters for initial steps and MCTS
+        self.choose_num_steps(self.iter)
+
+        # If we are in the very first iteration, we perform the pre-calculations.
+        if self.iter == 0:
+            # Save statistics (hidden)
             #with open('data/threads_player1_boardsize_{}.txt'.format(self.board_size), 'w') as filehandle:
             #        filehandle.write(("Threads\n"))
-            start_time = time()
-            self.first_steps_list = self.initialStep(possible_steps, chess_board, my_pos, adv_pos,self.num_precalculated_steps,self.num_autoplay_initial)
-            self.initial_step_time = time() - start_time
+
+            # Perform pre-calculations
+            self.first_steps_list = self.initialStep(possible_steps, chess_board, my_pos, adv_pos,self.num_precalculated_steps,self.num_sim_initial)
+        # Number of first steps
         len_list = len(self.first_steps_list)
-        if self.num_steps < len_list:
-            best_step = self.first_steps_list[self.num_steps]
-            self.num_steps = self.num_steps +1
-        if self.num_steps < len_list and self.check_valid_step(my_pos, tuple(best_step[0:2]), best_step[2]):
+        # If we still have pre-calculated steps left, take them.
+        if self.iter < len_list:
+            best_step = self.first_steps_list[self.iter]    # Take step (this value is returned)
+            self.iter = self.iter +1                        # Increment iteration counter
+        
+        # If the pre-calculated step is invalid, return it and let the base code make os take a random step
+        if self.iter < len_list and self.check_valid_step(my_pos, tuple(best_step[0:2]), best_step[2]):
             print("*** Precalculated move was invalid ***")
             return tuple(best_step[0:2]), best_step[2]
+        # If we don't have anymore pre-calculated steps left, perform MCTS
         else:
             start_time = time()
-            best_step = self.student_autoplay2(self.num_games_autoplay,possible_steps, chess_board, my_pos, adv_pos)
-            self.autoplay_time = time() - start_time
-        #best_step = self.student_autoplay(10, possible_steps, chess_board, my_pos, adv_pos)
-        # NB: REMEMBER TO DELETE THIS
-        #with open('data/threads_player1_boardsize_{}.txt'.format(self.board_size), 'a') as filehandle:
-        #    filehandle.write(("{}\n".format(self.num_games_autoplay)))
+            best_step = self.MCTS_simulation(self.num_sim_MCTS,possible_steps, chess_board, my_pos, adv_pos)
+            self.MCTS_time = time() - start_time
+        # Save statistics (hidden)
+        # with open('data/threads_player1_boardsize_{}.txt'.format(self.board_size), 'a') as filehandle:
+        #    filehandle.write(("{}\n".format(self.num_sim_MCTS)))
 
         return tuple(best_step[0:2]), best_step[2]
