@@ -1,7 +1,7 @@
-- name: "Your full name as appears on your transcript"
-  mcgill_id: "Your mcgill id"
-  email: "email@mail.mcgill.ca"
+- name: "Freja Petersen"
+  mcgill_id: "261122938"
+  email: "freja.petersen@mail.mcgill.ca"
 
-- name: "Your full name as appears on your transcript"
-  mcgill_id: "Your mcgill id"
-  email: "email@mail.mcgill.ca"
+- name: "Eliska Suchardova"
+  mcgill_id: "261118612"
+  email: "eliska.suchardova@mail.mcgill.ca"
