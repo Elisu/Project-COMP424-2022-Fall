@@ -25,7 +25,6 @@ from time import time
 
 @register_agent("student_agent")
 class StudentAgent(Agent):
-    #rnd.seed(16)
     """
     A dummy class for your implementation. Feel free to use this class to
     add any helper functionalities needed for your agent.
@@ -40,6 +39,8 @@ class StudentAgent(Agent):
             "d": 2,
             "l": 3,
         }
+        self.autoplay = True
+        self.print_statements = False
         self.turn = None                                # Whose turn it is. 0: our player. 1: opponent's turn
         self.cur_pos = None                             # Current position of our player
         self.adv_pos = None                             # Current position of opponent
@@ -304,7 +305,7 @@ class StudentAgent(Agent):
 
         best_steps = [] # Array for saving the steps to take.
         for i in range(numStep): # Loop over number of pre-calculated steps
-            print("Pre-calculate step number {}".format(i+1))
+            if self.print_statements: print("Pre-calculate step number {}".format(i+1))
             # Generate possible steps
             possible_steps = self.generate_steps(my_pos,self.max_step)
             # Find the best initial step using MCTS
@@ -413,7 +414,7 @@ class StudentAgent(Agent):
         
         # If the pre-calculated step is invalid, return it and let the base code make os take a random step
         if self.iter < len_list and self.check_valid_step(my_pos, tuple(best_step[0:2]), best_step[2]):
-            print("*** Precalculated move was invalid ***")
+            self.print_statements: print("*** Precalculated move was invalid ***")
             return tuple(best_step[0:2]), best_step[2]
         # If we don't have anymore pre-calculated steps left, perform MCTS
         else:
