@@ -377,7 +377,8 @@ class StudentAgent(Agent):
             # Here, we make the parameters dependent on the time spent.
             if self.MCTS_time > 1.9 and self.num_sim_MCTS>1:
                 self.num_sim_MCTS = round(self.num_sim_MCTS/2)
-            elif self.MCTS_time < 0.3 and self.num_sim_MCTS <50:
+            #elif self.MCTS_time < 0.3 and self.num_sim_MCTS <50:
+            elif self.MCTS_time < 0.3 and self.num_sim_MCTS <1000:
                 self.num_sim_MCTS = self.num_sim_MCTS*2
         
 
@@ -414,7 +415,7 @@ class StudentAgent(Agent):
         
         # If the pre-calculated step is invalid, return it and let the base code make os take a random step
         if self.iter < len_list and self.check_valid_step(my_pos, tuple(best_step[0:2]), best_step[2]):
-            self.print_statements: print("*** Precalculated move was invalid ***")
+            if self.print_statements: print("*** Precalculated move was invalid ***")
             return tuple(best_step[0:2]), best_step[2]
         # If we don't have anymore pre-calculated steps left, perform MCTS
         else:
@@ -422,7 +423,7 @@ class StudentAgent(Agent):
             best_step = self.MCTS_simulation(self.num_sim_MCTS,possible_steps, chess_board, my_pos, adv_pos)
             self.MCTS_time = time() - start_time
         # Save statistics (hidden)
-        # with open('data/threads_player1_boardsize_{}.txt'.format(self.board_size), 'a') as filehandle:
+        #with open('data/threads_player1_boardsize_{}.txt'.format(self.board_size), 'a') as filehandle:
         #    filehandle.write(("{}\n".format(self.num_sim_MCTS)))
 
         return tuple(best_step[0:2]), best_step[2]

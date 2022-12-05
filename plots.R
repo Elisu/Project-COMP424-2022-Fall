@@ -1,6 +1,7 @@
 rm(list = ls())
 library(ggplot2)
 library(data.table)
+library(scales)
 
 setwd("~/Documents/Uni/Study abroad/NiendeSemester/COMP 424/Project/Project-COMP424-2022-Fall")
 
@@ -75,7 +76,8 @@ ggplot(data_threads, aes(x=round, y=time, group = board_size, color = board_size
   ggtitle("Number of simulations per move") + 
   xlab("Round") + 
   ylab("Simulations (#)") + 
-  labs(color='Board size')
+  labs(color='Board size') +
+  coord_trans(y="log10")
 
 ggsave("threads_autoplay2_tuned.eps", plot = last_plot(), width = 18, height = 12,units = "cm")
 
